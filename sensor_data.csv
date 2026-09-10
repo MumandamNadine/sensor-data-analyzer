@@ -1,0 +1,12 @@
+device,temperature
+sensor-01,25
+sensor-02,29
+sensor-03,35
+sensor-04,35
+sensor-05,28
+sensor-06,27
+sensor-07,31
+sensor-08,24
+sensor-09,26
+sensor-10,29
+sensor-11,error
