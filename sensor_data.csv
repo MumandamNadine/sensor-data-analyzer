@@ -1,12 +1,11 @@
-device,temperature
-sensor-01,25
-sensor-02,29
-sensor-03,35
-sensor-04,35
-sensor-05,28
-sensor-06,27
-sensor-07,31
-sensor-08,24
-sensor-09,26
-sensor-10,29
-sensor-11,error
+device,timestamp,temperature,humidity,soil_moisture
+sensor-01,2026-09-10 08:00:00,25,78,50
+sensor-02,2026-09-10 08:03:00,33,86,45
+sensor-03,2026-09-10 08:05:00,30,94,46
+sensor-04,2026-09-10 08:06:00,25,50,47
+sensor-05,2026-09-10 08:15:00,27,80,28
+sensor-06,2026-09-10 08:20:00,29,90,43
+sensor-07,2026-09-10 08:27:00,30,93,41
+sensor-08,2026-09-10 08:33:00,29,88,40
+sensor-09,2026-09-10 08:37:00,35,71,16
+sensor-10,2026-09-10 08:40:00,30,93,43

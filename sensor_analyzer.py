@@ -1,110 +1,113 @@
-import csv
-from pathlib import Path
+import pandas as pd
+
+data = pd.read_csv("sensor_data.csv")
+
+# Remove accidental spaces from column names
+data.columns = data.columns.str.strip()
+
+# Clean device names
+data["device"] = data["device"].astype("string").str.strip()
+
+# Convert empty device names into missing values
+data["device"] = data["device"].replace("", pd.NA)
+
+# Convert timestamps
+data["timestamp"] = pd.to_datetime(
+    data["timestamp"],
+    errors="coerce"
+)
+
+# Convert sensor measurements
+numeric_columns = [
+    "temperature",
+    "humidity",
+    "soil_moisture"
+]
+
+for column in numeric_columns:
+    data[column] = pd.to_numeric(
+        data[column],
+        errors="coerce"
+    )
+
+# Columns required for a valid reading
+required_columns = [
+    "device",
+    "timestamp",
+    "temperature",
+    "humidity",
+    "soil_moisture"
+]
+
+# Find rows containing missing or invalid values
+invalid_rows = data[
+    data[required_columns].isna().any(axis=1)
+]
 
 
-def load_readings(file_path):
-    with file_path.open("r", newline="", encoding="utf-8-sig") as file:
-        reader = csv.DictReader(file)
-        return list(reader)
+# Remove invalid rows
+clean_data = data.dropna(
+    subset=required_columns
+).copy()
 
+# Check acceptable measurement ranges
+valid_ranges = (
+    clean_data["humidity"].between(0, 100)
+    & clean_data["soil_moisture"].between(0, 100)
+    & clean_data["temperature"].between(-40, 80)
+)
 
-def convert_temperatures(readings):
-    valid_readings = []
+clean_data = clean_data[valid_ranges].copy()
 
-    for reading in readings:
-        try:
-            reading["temperature"] = float(reading["temperature"])
-            valid_readings.append(reading)
-        except (ValueError, TypeError):
-            device = reading.get("device", "unknown device")
-            print(f"Skipping invalid reading from {device}")
+# Arrange readings chronologically
+clean_data = clean_data.sort_values("timestamp")
 
-    return valid_readings
+sensor_columns = [
+    "temperature",
+    "humidity",
+    "soil_moisture"
+]
 
+# Calculate summary statistics
+summary = clean_data[sensor_columns].agg(
+    ["count", "mean", "min", "max"]
+).round(2)
 
-def analyze_temperatures(readings):
-    if not readings:
-        return {
-            "count": 0,
-            "average": None,
-            "minimum": None,
-            "maximum": None
-        }
+#create alerts
+def find_high_temperature(data,threshold):
+    condition = data["temperature"] > threshold
+    result = data.loc[condition, ["temperature","device","timestamp"]]
+    return result
 
-    temperatures = []
+def find_high_humidity(data,threshold):
+    condition = data["humidity"]> threshold
+    result = data.loc[condition, ["humidity","device","timestamp"]]
+    return result
 
-    for reading in readings:
-        temperatures.append(reading["temperature"])
+def find_dry_soil(data,threshold):
+    condition = data["soil_moisture"]<threshold
+    result = data.loc[condition, ["soil_moisture","device","timestamp"]]
+    return result
 
-    return {
-        "count": len(temperatures),
-        "average": round(sum(temperatures) / len(temperatures), 2),
-        "minimum": min(temperatures),
-        "maximum": max(temperatures)
-    }
+alert_temp=find_high_temperature(clean_data, 30)
+alert_hum=find_high_humidity(clean_data, 85)
+alert_soil=find_dry_soil(clean_data, 25)
+analyzed_data=clean_data.copy()
+alert_columns = [
+    "high_temperature",
+    "high_humidity",
+    "dry_soil"
+]
+analyzed_data["high_temperature"] = (analyzed_data["temperature"] > 30)
+analyzed_data["high_humidity"] = (analyzed_data["humidity"] > 85)
+analyzed_data["dry_soil"] = (analyzed_data["soil_moisture"] < 25)
+analyzed_data["alert_count"] = analyzed_data[alert_columns].sum(axis=1)
 
-
-def create_temperature_alerts(readings, threshold):
-    alerts = []
-
-    for reading in readings:
-        if reading["temperature"] > threshold:
-            alerts.append(
-                f'{reading["device"]} has a high temperature of '
-                f'{reading["temperature"]}°C'
-            )
-
-    return alerts
-
-
-def write_report(report_path, summary, alerts):
-    with report_path.open("w", encoding="utf-8") as report_file:
-        report_file.write("Sensor Data Report\n")
-        report_file.write("==================\n")
-        report_file.write(f"Valid readings: {summary['count']}\n")
-        report_file.write(
-            f"Average temperature: {summary['average']}°C\n"
-        )
-        report_file.write(
-            f"Minimum temperature: {summary['minimum']}°C\n"
-        )
-        report_file.write(
-            f"Maximum temperature: {summary['maximum']}°C\n"
-        )
-
-        report_file.write("\nTemperature Alerts\n")
-        report_file.write("------------------\n")
-
-        if alerts:
-            for alert in alerts:
-                report_file.write(alert + "\n")
-        else:
-            report_file.write("No high-temperature alerts.\n")
-
-
-def main():
-    project_folder = Path(__file__).resolve().parent
-    file_path = project_folder / "sensor_data.csv"
-    report_path = project_folder / "sensor_report.txt"
-
-    try:
-        readings = load_readings(file_path)
-    except FileNotFoundError:
-        print(f"CSV file not found: {file_path}")
-        return
-
-    readings = convert_temperatures(readings)
-    summary = analyze_temperatures(readings)
-    alerts = create_temperature_alerts(readings, 30)
-
-    print(summary)
-
-    for alert in alerts:
-        print(alert)
-
-    write_report(report_path, summary, alerts)
-    print(f"Report saved to: {report_path}")
-
-
-if __name__ == "__main__":
-    main()
+analyzed_data["status"] = "Normal"
+condition = analyzed_data["alert_count"] > 0
+analyzed_data.loc[condition, "status"] = "Alert"
+combined_alerts=analyzed_data[analyzed_data["alert_count"]>0]
+print("Summary Statistics:")
+print(summary)
+analyzed_data.to_csv("analyzed_sensor_data.csv", index=False)
+combined_alerts.to_csv("combined_alerts.csv", index=False)
