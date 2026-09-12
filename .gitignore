@@ -5,3 +5,5 @@ __pycache__/
 venv/
 .env
 sensor_report.txt
+analyzed_sensor_data.csv
+combined_alerts.csv
